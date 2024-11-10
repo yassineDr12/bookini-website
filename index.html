@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookini - Mobile Car Wash Services in Morocco</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.3/cdn.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.37/libphonenumber-js.min.js"></script>
+</head>
+<body class="bg-white min-h-screen" x-data="{ 
+    phone: '', 
+    submitted: false, 
+    isValid: false,
+    isLoading: false,
+    errorMsg: '',
+    showPrivacyModal: false,
+    privacyAccepted: false,
+    cities: ['Casablanca', 'Rabat', 'Marrakech', 'Tangier', 'Fez'],
+    selectedCity: '',
+
+    validatePhone() {
+        try {
+            // Specifically validate for Morocco (+212)
+            const phoneNumber = window.libphonenumber.parsePhoneNumber(this.phone, 'MA');
+            this.isValid = phoneNumber.isValid();
+            if (!this.isValid) {
+                this.errorMsg = 'Please enter a valid Moroccan phone number';
+            } else {
+                this.errorMsg = '';
+                this.phone = phoneNumber.format('INTERNATIONAL');
+            }
+        } catch (error) {
+            this.isValid = false;
+            this.errorMsg = 'Please enter a valid Moroccan phone number';
+        }
+    },
+
+    async submitForm() {
+        if (!this.privacyAccepted) {
+            this.errorMsg = 'Please accept the privacy policy';
+            return;
+        }
+
+        if (!this.selectedCity) {
+            this.errorMsg = 'Please select your city';
+            return;
+        }
+
+        this.isLoading = true;
+        this.errorMsg = '';
+
+        try {
+            const lastSubmission = localStorage.getItem('lastSubmission');
+            const now = Date.now();
+            if (lastSubmission && (now - parseInt(lastSubmission)) < 24 * 60 * 60 * 1000) {
+                throw new Error('You can only submit once every 24 hours');
+            }
+
+            const supabase = createClient('https://qyblidlhkhcxpicelnea.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5YmxpZGxoa2hjeHBpY2VsbmVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU0ODkwNDIsImV4cCI6MjA0MTA2NTA0Mn0.8Is4vc8hGO8w8F1WLO71Q3MdTGPbuQQvZOFf5spqR-Q');
+            
+            const { error } = await supabase
+                .from('waitlist')
+                .insert([
+                    { 
+                        phone_number: this.phone,
+                        city: this.selectedCity,
+                        created_at: new Date(),
+                        privacy_accepted: true,
+                        user_agent: navigator.userAgent
+                    }
+                ]);
+
+            if (error) throw error;
+            
+            localStorage.setItem('lastSubmission', now.toString());
+            
+            this.submitted = true;
+            this.errorMsg = '';
+        } catch (error) {
+            console.error('Error:', error);
+            this.errorMsg = error.message || 'Something went wrong. Please try again.';
+        } finally {
+            this.isLoading = false;
+        }
+    }
+}">
+    <div class="container mx-auto px-4 py-16">
+        <!-- Header -->
+        <header class="text-center mb-16">
+            <h1 class="text-4xl md:text-6xl font-bold text-gray-800 mb-4">Bookini</h1>
+            <p class="text-xl text-gray-600">Your Car Wash Service in Morocco</p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="max-w-4xl mx-auto">
+            <!-- Service Description -->
+            <div class="grid md:grid-cols-2 gap-8 mb-16">
+                <div class="bg-blue-50 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Mobile Service</h3>
+                    <p class="text-gray-600">Professional car wash at your doorstep across major Moroccan cities. Available 7 days a week.</p>
+                </div>
+                <div class="bg-blue-50 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-3">Express Locations</h3>
+                    <p class="text-gray-600">Book a time slot at our partner locations for a professional and efficient car wash service and save your valuable time.</p>
+                </div>
+            </div>
+
+            <!-- Coming Soon Section -->
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">Launching Soon in Morocco!</h2>
+                <p class="text-gray-600 mb-8">Be the first to know when we launch in your city.</p>
+            </div>
+
+            <!-- Phone Number Form -->
+            <div class="max-w-md mx-auto">
+                <template x-if="!submitted">
+                    <form class="space-y-4" @submit.prevent="submitForm">
+                        <!-- City Selection -->
+                        <div>
+                            <select 
+                                x-model="selectedCity"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                                required
+                            >
+                                <option value="">Select your city</option>
+                                <template x-for="city in cities" :key="city">
+                                    <option :value="city" x-text="city"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div>
+                            <input 
+                                type="tel" 
+                                x-model="phone"
+                                @input="validatePhone"
+                                placeholder="Enter your phone number"
+                                class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                                required
+                            >
+                            <p class="text-sm text-gray-500 mt-1">Example: +212 6XX-XXXXXX</p>
+                        </div>
+
+                        <!-- Privacy Policy Checkbox -->
+                        <div class="flex items-start space-x-2">
+                            <input
+                                type="checkbox"
+                                id="privacy"
+                                x-model="privacyAccepted"
+                                class="mt-1"
+                            >
+                            <label for="privacy" class="text-sm text-gray-600">
+                                I accept the 
+                                <button 
+                                    type="button"
+                                    @click="showPrivacyModal = true"
+                                    class="text-blue-600 hover:underline"
+                                >
+                                    privacy policy
+                                </button>
+                            </label>
+                        </div>
+
+                        <button 
+                            type="submit"
+                            :disabled="!isValid || isLoading || !selectedCity"
+                            class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                        >
+                            <template x-if="isLoading">
+                                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </template>
+                            <span x-text="isLoading ? 'Submitting...' : 'Notify Me'"></span>
+                        </button>
+
+                        <!-- Error Message -->
+                        <div x-show="errorMsg" class="text-red-500 text-sm text-center" x-text="errorMsg"></div>
+                    </form>
+                </template>
+                
+                <template x-if="submitted">
+                    <div class="text-center p-4 bg-blue-50 rounded-lg">
+                        <p class="text-gray-800 font-semibold">Thank you for your interest!</p>
+                        <p class="text-gray-600">We'll notify you when we launch in <span x-text="selectedCity"></span>.</p>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Features -->
+            <div class="grid md:grid-cols-3 gap-6 mt-16">
+                <div class="text-center p-4">
+                    <div class="text-3xl mb-2">🚗</div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Professional Service</h3>
+                    <p class="text-gray-600 text-sm">Experienced and vetted car wash professionals</p>
+                </div>
+                <div class="text-center p-4">
+                    <div class="text-3xl mb-2">📱</div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Easy Booking</h3>
+                    <p class="text-gray-600 text-sm">Book and manage appointments through our mobile app</p>
+                </div>
+                <div class="text-center p-4">
+                    <div class="text-3xl mb-2">⭐</div>
+                    <h3 class="font-semibold text-gray-800 mb-2">Quality Guaranteed</h3>
+                    <p class="text-gray-600 text-sm">100% satisfaction guarantee on all services</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center mt-16 text-gray-600 text-sm">
+            <p>&copy; 2024 Bookini. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div 
+        x-show="showPrivacyModal" 
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
+        @click.self="showPrivacyModal = false"
+    >
+        <div class="bg-white rounded-lg p-6 max-w-lg max-h-[80vh] overflow-y-auto">
+            <h3 class="text-xl font-bold mb-4">Privacy Policy</h3>
+            <div class="prose">
+                <p class="mb-4">At Bookini, we take your privacy seriously. Here's how we handle your data:</p>
+                <ul class="list-disc pl-5 mb-4">
+                    <li>Your phone number will only be used to notify you about our launch and service updates</li>
+                    <li>We will never share your information with third parties</li>
+                    <li>You can request removal of your data at any time</li>
+                    <li>We store your phone number securely in our database</li>
+                    <li>We comply with all applicable Moroccan data protection laws</li>
+                </ul>
+                <p>For any privacy concerns, please contact drafate19@gmail.com</p>
+            </div>
+            <button 
+                @click="showPrivacyModal = false"
+                class="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+                Close
+            </button>
+        </div>
+    </div>
+</body>
+</html>
