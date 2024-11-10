@@ -8,6 +8,12 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.13.3/cdn.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.37/libphonenumber-js.min.js"></script>
+    <script>
+        const supabaseClient = supabase.createClient(
+            'https://qyblidlhkhcxpicelnea.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5YmxpZGxoa2hjeHBpY2VsbmVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU0ODkwNDIsImV4cCI6MjA0MTA2NTA0Mn0.8Is4vc8hGO8w8F1WLO71Q3MdTGPbuQQvZOFf5spqR-Q'
+        );
+    </script>
 </head>
 <body class="bg-white min-h-screen" x-data="{ 
     phone: '', 
@@ -19,37 +25,64 @@
     privacyAccepted: false,
     cities: ['Casablanca', 'Rabat', 'Marrakech', 'Tangier', 'Fez'],
     selectedCity: '',
+    cityError: '',
+    phoneError: '',
 
     validatePhone() {
+        if (!this.phone.trim()) {
+            this.phoneError = 'Phone number is required';
+            this.isValid = false;
+            return;
+        }
+
         try {
-            // Specifically validate for Morocco (+212)
             const phoneNumber = window.libphonenumber.parsePhoneNumber(this.phone, 'MA');
             this.isValid = phoneNumber.isValid();
             if (!this.isValid) {
-                this.errorMsg = 'Please enter a valid Moroccan phone number';
+                this.phoneError = 'Please enter a valid Moroccan phone number';
             } else {
-                this.errorMsg = '';
+                this.phoneError = '';
                 this.phone = phoneNumber.format('INTERNATIONAL');
             }
         } catch (error) {
             this.isValid = false;
-            this.errorMsg = 'Please enter a valid Moroccan phone number';
+            this.phoneError = 'Please enter a valid Moroccan phone number';
         }
     },
 
-    async submitForm() {
+    validateCity() {
+        if (!this.selectedCity) {
+            this.cityError = 'Please select your city';
+            return false;
+        }
+        this.cityError = '';
+        return true;
+    },
+
+    validateForm() {
+        this.validatePhone();
+        this.validateCity();
+        
         if (!this.privacyAccepted) {
             this.errorMsg = 'Please accept the privacy policy';
-            return;
+            return false;
         }
+        
+        return this.isValid && !this.cityError && this.privacyAccepted;
+    },
 
-        if (!this.selectedCity) {
-            this.errorMsg = 'Please select your city';
+    async submitForm() {
+        // Clear all previous errors
+        this.errorMsg = '';
+        this.phoneError = '';
+        this.cityError = '';
+        
+        // Validate form before submission
+        if (!this.validateForm()) {
             return;
         }
 
         this.isLoading = true;
-        this.errorMsg = '';
 
         try {
             const lastSubmission = localStorage.getItem('lastSubmission');
@@ -58,9 +91,7 @@
                 throw new Error('You can only submit once every 24 hours');
             }
 
-            const supabase = createClient('https://qyblidlhkhcxpicelnea.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF5YmxpZGxoa2hjeHBpY2VsbmVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjU0ODkwNDIsImV4cCI6MjA0MTA2NTA0Mn0.8Is4vc8hGO8w8F1WLO71Q3MdTGPbuQQvZOFf5spqR-Q');
-            
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('waitlist')
                 .insert([
                     { 
@@ -92,7 +123,6 @@
             <h1 class="text-4xl md:text-6xl font-bold text-gray-800 mb-4">Bookini</h1>
             <p class="text-xl text-gray-600">Your Car Wash Service in Morocco</p>
         </header>
-
         <!-- Main Content -->
         <div class="max-w-4xl mx-auto">
             <!-- Service Description -->
@@ -121,7 +151,9 @@
                         <div>
                             <select 
                                 x-model="selectedCity"
+                                @change="validateCity"
                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                                :class="{'border-red-500': cityError}"
                                 required
                             >
                                 <option value="">Select your city</option>
@@ -129,18 +161,31 @@
                                     <option :value="city" x-text="city"></option>
                                 </template>
                             </select>
+                            <p 
+                                x-show="cityError" 
+                                x-text="cityError" 
+                                class="text-red-500 text-sm mt-1"
+                            ></p>
                         </div>
 
+                        <!-- Phone Input -->
                         <div>
                             <input 
                                 type="tel" 
                                 x-model="phone"
                                 @input="validatePhone"
+                                @blur="validatePhone"
                                 placeholder="Enter your phone number"
                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition"
+                                :class="{'border-red-500': phoneError}"
                                 required
                             >
                             <p class="text-sm text-gray-500 mt-1">Example: +212 6XX-XXXXXX</p>
+                            <p 
+                                x-show="phoneError" 
+                                x-text="phoneError" 
+                                class="text-red-500 text-sm mt-1"
+                            ></p>
                         </div>
 
                         <!-- Privacy Policy Checkbox -->
@@ -165,7 +210,7 @@
 
                         <button 
                             type="submit"
-                            :disabled="!isValid || isLoading || !selectedCity"
+                            :disabled="isLoading"
                             class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                         >
                             <template x-if="isLoading">
